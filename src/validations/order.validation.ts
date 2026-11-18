@@ -9,6 +9,8 @@ export const listOrdersQuerySchema = z.object({
     .regex(/^[A-Z][A-Z0-9_]{1,39}$/, "category must be an UPPER_SNAKE key like GADGETS")
     .optional(),
   status: z.enum(OrderStatus).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 
 export const summaryQuerySchema = z.object({

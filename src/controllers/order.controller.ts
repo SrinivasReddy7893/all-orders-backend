@@ -1,31 +1,31 @@
 import { Request, Response } from "express";
 import prisma from "../config/prisma";
 import { asyncHandler } from "../utils/asyncHandler";
-import { fetchOrdersFromGmail } from "../services/gmail.service";
-import { upsertOrders, getOrders, getActiveOrders, getMonthlySummary } from "../services/order.service";
+import { AppError } from "../utils/AppError";
+import { syncAccount } from "../services/orderSync.service";
+import { getOrders, getActiveOrders, getMonthlySummary } from "../services/order.service";
 import { currentMonth } from "../services/spendSummary";
 import { listOrdersQuerySchema, summaryQuerySchema } from "../validations/order.validation";
 
+// POST /orders/sync — sync now instead of waiting for the 15-minute job.
 export const syncOrdersController = asyncHandler(async (req: Request, res: Response) => {
-  const userId = req.user.id;
-
-  const emails = await fetchOrdersFromGmail(userId);
-  await upsertOrders(emails.map((e) => ({ ...e, userId })));
-
-  // Next sync (manual or cron) only needs emails from here on.
-  await prisma.connectedEmailAccount.updateMany({
-    where: { userId },
-    data: { lastSyncedAt: new Date() },
+  const accounts = await prisma.connectedEmailAccount.findMany({
+    where: { userId: req.user.id },
+    select: { id: true, userId: true, email: true },
   });
+  if (!accounts.length) throw new AppError("No connected Gmail account found", 400, "GMAIL_NOT_CONNECTED");
 
-  res.json({ success: true, message: "Orders synced" });
+  const results = await Promise.all(accounts.map(syncAccount));
+  if (results.every((r) => r.status === "BUSY")) {
+    throw new AppError("A sync is already running. Try again in a moment.", 409, "SYNC_IN_PROGRESS");
+  }
+  res.json({ success: true, message: "Orders synced", data: { accounts: results } });
 });
 
-// GET /orders?category=GADGETS&status=SHIPPED
+// GET /orders?category=GADGETS&status=SHIPPED&page=1&pageSize=20
 export const getOrdersController = asyncHandler(async (req: Request, res: Response) => {
-  const filters = listOrdersQuerySchema.parse(req.query);
-  const orders = await getOrders(req.user.id, filters);
-  res.json({ success: true, data: { orders } });
+  const query = listOrdersQuerySchema.parse(req.query);
+  res.json({ success: true, data: await getOrders(req.user.id, query) });
 });
 
 export const getActiveOrdersController = asyncHandler(async (req: Request, res: Response) => {

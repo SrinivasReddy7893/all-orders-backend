@@ -1,5 +1,6 @@
 import prisma from "../config/prisma";
 import { AppError } from "../utils/AppError";
+import type { Prisma } from "../../generated/prisma/client";
 
 interface UpdateProfileInput {
   userId: string;
@@ -24,7 +25,7 @@ export const updateProfileService = async ({
     throw new AppError("User not found", 404, "USER_NOT_FOUND");
   }
 
-  const dataToUpdate: any = {};
+  const dataToUpdate: Prisma.UserUpdateInput = {};
 
   // ✅ name & avatar (safe to update anytime)
   if (name) dataToUpdate.name = name;

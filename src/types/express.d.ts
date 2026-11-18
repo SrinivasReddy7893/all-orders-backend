@@ -1,9 +1,10 @@
-import { User } from "@prisma/client";
+import type { User } from "../../generated/prisma/client";
 
 declare global {
   namespace Express {
     interface Request {
-      user?: User;
+      // Set by authMiddleware. Only read it in routes mounted behind authMiddleware.
+      user: User;
     }
   }
 }

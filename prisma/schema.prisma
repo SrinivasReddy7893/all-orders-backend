@@ -43,6 +43,7 @@ model ConnectedEmailAccount {
   tokenExpiry         DateTime?
   lastSyncedAt        DateTime?
   isSyncing           Boolean @default(false)
+  syncStartedAt       DateTime? // when the current sync took the lock (stale after 15 min)
 
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt

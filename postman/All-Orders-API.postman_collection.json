@@ -117,7 +117,7 @@
                 "send-otp"
               ]
             },
-            "description": "Generates a 6-digit OTP. It is not sent by SMS — read it from the server log line \"OTP for <phone>: <otp>\", then put it in the `otp` collection variable."
+            "description": "Generates a 6-digit OTP (development: printed in the server log; no SMS provider yet). Limited to 10 send/verify requests per 15 minutes per IP; one OTP per minute per phone."
           }
         },
         {
@@ -168,7 +168,7 @@
                 "verify-otp"
               ]
             },
-            "description": "Returns accessToken, refreshToken and user. The test script saves both tokens to collection variables."
+            "description": "Returns accessToken (15 min), refreshToken (7 days) and user. 5 wrong codes destroy the OTP (429 OTP_ATTEMPTS_EXCEEDED) — request a new one."
           }
         },
         {
@@ -181,7 +181,9 @@
                 "exec": [
                   "const res = pm.response.json();",
                   "if (res.success && res.data) {",
+                  "  // Refresh tokens rotate: the old one stops working, so save the new one too.",
                   "  pm.collectionVariables.set('accessToken', res.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', res.data.refreshToken);",
                   "}"
                 ]
               }
@@ -217,7 +219,7 @@
                 "refresh"
               ]
             },
-            "description": "Exchanges the refresh token for a new access token and saves it."
+            "description": "Returns a new access token AND a new refresh token; the old refresh token stops working. The test script saves both."
           }
         },
         {
@@ -407,7 +409,7 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/orders?category=&status=",
+              "raw": "{{baseUrl}}/orders?page=1&pageSize=20",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -416,20 +418,30 @@
               ],
               "query": [
                 {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default 1)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Orders per page, 1–100 (default 20)"
+                },
+                {
                   "key": "category",
                   "value": "",
-                  "description": "Optional: APPAREL, FOOD, GROCERIES, GADGETS, PERSONAL_CARE, HOME, OTHER",
+                  "description": "Optional category key, e.g. GADGETS",
                   "disabled": true
                 },
                 {
                   "key": "status",
                   "value": "",
-                  "description": "Optional: PLACED, CONFIRMED, PROCESSING, SHIPPED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED, RETURNED, REFUNDED",
+                  "description": "Optional status, e.g. SHIPPED",
                   "disabled": true
                 }
               ]
             },
-            "description": "Each order once, at its latest status, newest first. Includes title, category/categoryLabel, amount/currency and orderedAt. Optional filters: category, status."
+            "description": "Each order once, at its latest status, newest first, 20 per page. Response: data.orders + data.pagination { page, pageSize, totalItems, totalPages }."
           }
         },
         {

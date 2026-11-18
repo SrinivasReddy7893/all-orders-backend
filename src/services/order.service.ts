@@ -153,14 +153,23 @@ const NEWEST_FIRST = [{ orderedAt: { sort: "desc" as const, nulls: "last" as con
 
 export const getOrders = async (
   userId: string,
-  filters: { category?: OrderCategory; status?: OrderStatus } = {}
+  { category, status, page = 1, pageSize = 20 }: { category?: OrderCategory; status?: OrderStatus; page?: number; pageSize?: number } = {}
 ) => {
-  const orders = await prisma.order.findMany({
-    where: { userId, category: filters.category, status: filters.status },
-    include: { categoryRef: { select: { label: true } } },
-    orderBy: NEWEST_FIRST,
-  });
-  return orders.map(toOrderDto);
+  const where = { userId, category, status };
+  const [orders, totalItems] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      include: { categoryRef: { select: { label: true } } },
+      orderBy: NEWEST_FIRST,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.order.count({ where }),
+  ]);
+  return {
+    orders: orders.map(toOrderDto),
+    pagination: { page, pageSize, totalItems, totalPages: Math.ceil(totalItems / pageSize) },
+  };
 };
 
 // Orders still on their way: not yet delivered, cancelled, returned or refunded.
