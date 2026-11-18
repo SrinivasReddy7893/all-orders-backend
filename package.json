@@ -7,7 +7,8 @@
     "dev": "node --watch --require ts-node/register/transpile-only src/server.ts",
     "build": "tsc",
     "start": "node dist/src/server.js",
-    "test": "node --require ts-node/register/transpile-only --test \"src/**/*.test.ts\""
+    "test": "node --require ts-node/register/transpile-only --test \"src/**/*.test.ts\"",
+    "test:integration": "node scripts/integration-test.js"
   },
   "keywords": [],
   "author": "",
