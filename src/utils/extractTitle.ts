@@ -152,6 +152,3 @@ export const extractTitles = (body: string, subject = ""): string[] => {
 
   return [...titles].slice(0, MAX_TITLES);
 };
-
-export const extractTitle = (body: string, subject = ""): string | null =>
-  extractTitles(body, subject)[0] ?? null;

@@ -13,7 +13,7 @@ export type CandidateOrder = {
 
 const CLOSED = new Set<OrderStatus>(["DELIVERED", "CANCELLED", "RETURNED", "REFUNDED"]);
 // A food/grocery order lives for minutes to a couple of hours.
-export const QUICK_COMMERCE_WINDOW_MS = 3 * 60 * 60 * 1000;
+const QUICK_COMMERCE_WINDOW_MS = 3 * 60 * 60 * 1000;
 
 const same = (a: string | null, b: string | null) => !!a && !!b && normalizeTrackingQuery(a) === normalizeTrackingQuery(b);
 

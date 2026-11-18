@@ -9,9 +9,6 @@
 
 export type OrderCategory = string; // UPPER_SNAKE key, e.g. "GADGETS", "FRAGRANCE"
 
-// The categories the app starts with (seeded by migration).
-export const DEFAULT_CATEGORIES = ["APPAREL", "FOOD", "GROCERIES", "GADGETS", "PERSONAL_CARE", "HOME", "OTHER"];
-
 // Friendlier labels where the key alone doesn't read well.
 const LABELS: Record<string, string> = {
   PERSONAL_CARE: "Beauty & Personal Care",

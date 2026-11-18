@@ -5,6 +5,7 @@ import { createOAuthClient } from "../config/google";
 import { env } from "../config/env";
 import { AppError } from "../utils/AppError";
 import { logger } from "../utils/logger";
+import { decryptSecret, encryptSecret } from "../utils/tokenCrypto";
 
 // The OAuth `state` is a short-lived signed token, so the callback can trust
 // which user started the flow. A separate secret keeps it from ever being
@@ -62,16 +63,16 @@ export const connectGmailAccount = async (code: string, state: string) => {
   await prisma.connectedEmailAccount.upsert({
     where: { email },
     update: {
-      googleAccessToken: tokens.access_token,
-      googleRefreshToken: tokens.refresh_token || undefined,
+      googleAccessToken: encryptSecret(tokens.access_token),
+      googleRefreshToken: tokens.refresh_token ? encryptSecret(tokens.refresh_token) : undefined,
       tokenExpiry,
     },
     create: {
       userId,
       email,
       provider: "gmail",
-      googleAccessToken: tokens.access_token,
-      googleRefreshToken: tokens.refresh_token ?? "",
+      googleAccessToken: encryptSecret(tokens.access_token),
+      googleRefreshToken: encryptSecret(tokens.refresh_token ?? ""),
       tokenExpiry,
     },
   });
@@ -92,8 +93,8 @@ export const getAuthorizedGmailClient = async (userId: string) => {
 
   const client = createOAuthClient();
   client.setCredentials({
-    access_token: connectedAccount.googleAccessToken,
-    refresh_token: connectedAccount.googleRefreshToken,
+    access_token: decryptSecret(connectedAccount.googleAccessToken),
+    refresh_token: decryptSecret(connectedAccount.googleRefreshToken),
   });
 
   let accessToken: string | null | undefined;
@@ -112,10 +113,15 @@ export const getAuthorizedGmailClient = async (userId: string) => {
     throw new Error("Failed to refresh access token");
   }
 
-  if (accessToken !== connectedAccount.googleAccessToken) {
+  // Save a refreshed access token, and encrypt rows stored before encryption existed.
+  const storedPlaintext = !connectedAccount.googleRefreshToken.startsWith("enc:");
+  if (accessToken !== decryptSecret(connectedAccount.googleAccessToken) || storedPlaintext) {
     await prisma.connectedEmailAccount.update({
       where: { id: connectedAccount.id },
-      data: { googleAccessToken: accessToken },
+      data: {
+        googleAccessToken: encryptSecret(accessToken),
+        googleRefreshToken: encryptSecret(decryptSecret(connectedAccount.googleRefreshToken)),
+      },
     });
   }
 
