@@ -1,0 +1,193 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id         String    @id @default(uuid())
+  phone      String?   @unique
+  email      String?   @unique
+  googleId   String?   @unique
+  name       String?
+  avatar     String?
+  isPhoneVerified  Boolean   @default(false)
+  isEmailVerified  Boolean   @default(false)
+  sessions   Session[]
+  orders Order[]
+  connectedEmails ConnectedEmailAccount[]
+  receivedMessages ReceivedMessage[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model ConnectedEmailAccount {
+  id                  String   @id @default(uuid())
+
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  email               String   @unique
+  provider            String   @default("gmail")
+
+  googleAccessToken   String
+  googleRefreshToken  String
+  tokenExpiry         DateTime?
+  lastSyncedAt        DateTime?
+  isSyncing           Boolean @default(false)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model otp {
+  id        String   @id @default(uuid())
+  phone     String
+  code      String   // SHA-256 of the 6-digit code
+  expiresAt DateTime
+  attempts  Int      @default(0) // wrong guesses so far; the code is destroyed at the limit
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Session {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash    String  @unique // SHA-256 of the refresh token; the token itself is never stored
+  userAgent    String?
+  ip           String?
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Order {
+  id                String   @id @default(uuid())
+
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // External platform details
+  externalOrderId   String?  // Amazon/Flipkart order ID
+  vendor            String   // "amazon", "flipkart", etc.
+
+  // Order details
+  title             String?  // "iPhone 15"
+  titles            String[]
+  amount            Float?
+  currency          String?  // "INR"
+  category          String   @default("OTHER") // Category.key — see src/services/orderCategory.ts
+  categoryRef       Category @relation(fields: [category], references: [key], onUpdate: Cascade)
+
+  // Status tracking
+  status            OrderStatus @default(PLACED)
+
+  // Dates
+  orderedAt         DateTime?
+  expectedDelivery  DateTime?
+  deliveredAt       DateTime?
+
+  // Raw email reference (important)
+  source            OrderSource @default(EMAIL)
+  sourceId          String? // Gmail message ID
+
+  // Raw data (for debugging + future parsing improvements)
+  rawEmailSnippet   String?
+
+  trackingNumber   String?
+  carrierCode      String?  // e.g. "SHIPROCKET" — see src/services/tracking/carriers.ts
+  carrierName      String?
+  trackingUrl      String?  // courier's tracking page for this shipment
+  events           OrderEvent[]
+  gmailMessageId   String? @unique
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, orderedAt]) // monthly spend summary
+  @@index([externalOrderId])
+  @@index([userId, trackingNumber])
+  // Order numbers are only unique per shop (two Shopify stores can both have #1004).
+  @@unique([userId, vendor, externalOrderId])
+}
+
+
+
+
+
+// One step in an order's tracking timeline: an order email today, courier
+// scans from a live tracking provider later.
+model OrderEvent {
+  id          String      @id @default(uuid())
+  orderId     String
+  order       Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status      OrderStatus?
+  occurredAt  DateTime
+  description String
+  location    String?
+  source      String      // "EMAIL" | "CARRIER"
+  sourceRef   String      // Gmail message ID, or provider event ID
+  createdAt   DateTime    @default(now())
+
+  @@unique([orderId, sourceRef])
+  @@index([orderId, occurredAt])
+}
+
+// Phone messages already processed (SMS / app notifications), so a message the
+// app sends twice is handled once. Only IDs and the outcome are kept — never the
+// text of messages that weren't about an order.
+model ReceivedMessage {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source     String   // "SMS" | "NOTIFICATION"
+  externalId String   // the phone's own message ID
+  outcome    String   // "ATTACHED" | "CREATED" | "IGNORED"
+  orderId    String?
+  receivedAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, source, externalId])
+}
+
+// Dashboard categories. Seeded with the defaults; new ones (e.g. FRAGRANCE) are
+// created automatically the first time an order is categorised into them.
+model Category {
+  key       String   @id // UPPER_SNAKE, e.g. "GADGETS"
+  label     String       // "Gadgets"
+  orders    Order[]
+  createdAt DateTime @default(now())
+}
+
+enum OrderStatus {
+  PLACED
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  RETURNED
+  REFUNDED
+}
+
+enum OrderSource {
+  EMAIL
+  SMS
+  NOTIFICATION
+  MANUAL
+}

@@ -1,0 +1,609 @@
+{
+  "info": {
+    "name": "All Orders API",
+    "description": "All Orders backend API (v1).\n\nBase URL: {{baseUrl}} (default http://localhost:4000/api/v1).\n\nQuick start:\n1. Auth > Send OTP (the OTP is printed in the server console; no SMS is sent).\n2. Auth > Verify OTP — saves accessToken and refreshToken automatically.\n3. Call any User / Orders / Gmail request — they use Bearer {{accessToken}} from the collection auth.\n\nAll /api/v1 routes are rate-limited to 100 requests per 15 minutes per IP.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000/api/v1"
+    },
+    {
+      "key": "phone",
+      "value": "9876543210"
+    },
+    {
+      "key": "otp",
+      "value": ""
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "General",
+      "description": "Public routes. No login needed.",
+      "item": [
+        {
+          "name": "Welcome",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                ""
+              ]
+            },
+            "description": "Returns plain text: \"Welcome to All Orders App!\""
+          }
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Server uptime, platform, Node version, CPU load and memory usage."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "Phone OTP login and session management.",
+      "item": [
+        {
+          "name": "Send OTP",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/send-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "send-otp"
+              ]
+            },
+            "description": "Generates a 6-digit OTP. It is not sent by SMS — read it from the server log line \"OTP for <phone>: <otp>\", then put it in the `otp` collection variable."
+          }
+        },
+        {
+          "name": "Verify OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.success && res.data) {",
+                  "  pm.collectionVariables.set('accessToken', res.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', res.data.refreshToken);",
+                  "}",
+                  "pm.test('OTP verified', () => pm.expect(res.success).to.be.true);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{phone}}\",\n  \"otp\": \"{{otp}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-otp"
+              ]
+            },
+            "description": "Returns accessToken, refreshToken and user. The test script saves both tokens to collection variables."
+          }
+        },
+        {
+          "name": "Refresh Access Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.success && res.data) {",
+                  "  pm.collectionVariables.set('accessToken', res.data.accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Exchanges the refresh token for a new access token and saves it."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Requires Bearer token. Revokes the given refresh token."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Gmail Connection",
+      "description": "Connect a Gmail account so orders can be read from email.",
+      "item": [
+        {
+          "name": "Get Gmail Connect URL",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/auth/connect-gmail",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "connect-gmail"
+              ]
+            },
+            "description": "Requires Bearer token. Returns data.url — open it in a browser and sign in with Google. Google then redirects to /auth/google/callback."
+          }
+        },
+        {
+          "name": "Google OAuth Callback",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/auth/google/callback?code=<google_code>&state=<user_id>",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "google",
+                "callback"
+              ],
+              "query": [
+                {
+                  "key": "code",
+                  "value": "<google_code>",
+                  "description": "Authorization code from Google"
+                },
+                {
+                  "key": "state",
+                  "value": "<user_id>",
+                  "description": "User id passed through the OAuth flow"
+                }
+              ]
+            },
+            "description": "Called by Google's redirect, not normally by hand. Listed here for reference."
+          }
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "description": "All routes require Bearer token.",
+      "item": [
+        {
+          "name": "Get Me",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/user/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "me"
+              ]
+            },
+            "description": "Current user's profile plus helper flags (hasEmail, isProfileComplete, …)."
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test User\",\n  \"email\": \"test@example.com\",\n  \"avatar\": \"https://example.com/avatar.png\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "profile"
+              ]
+            },
+            "description": "All fields optional: name (min 2 chars), email (valid email), phone (min 10 chars), avatar (URL)."
+          }
+        },
+        {
+          "name": "Delete Account",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/user",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user"
+              ]
+            },
+            "description": "⚠️ Deletes the current user's account."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "description": "All routes require Bearer token. Connect Gmail first for sync to find orders.",
+      "item": [
+        {
+          "name": "Sync Orders from Gmail",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/orders/sync",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "sync"
+              ]
+            },
+            "description": "Reads order emails from the connected Gmail account and saves them."
+          }
+        },
+        {
+          "name": "Get All Orders",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/orders?category=&status=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "",
+                  "description": "Optional: APPAREL, FOOD, GROCERIES, GADGETS, PERSONAL_CARE, HOME, OTHER",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "Optional: PLACED, CONFIRMED, PROCESSING, SHIPPED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED, RETURNED, REFUNDED",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Each order once, at its latest status, newest first. Includes title, category/categoryLabel, amount/currency and orderedAt. Optional filters: category, status."
+          }
+        },
+        {
+          "name": "Get Active Orders",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/orders/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "active"
+              ]
+            },
+            "description": "Orders still on their way (not delivered, cancelled, returned or refunded)."
+          }
+        },
+        {
+          "name": "Monthly Spend Summary",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/orders/summary?month=2026-11",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "month",
+                  "value": "2026-11",
+                  "description": "YYYY-MM, India time. Omit for the current month."
+                }
+              ]
+            },
+            "description": "Dashboard data: totalSpent, orderCount and per-category { category, label, orderCount, spent } for the month (all 7 categories, biggest first). Cancelled/returned/refunded orders are excluded; unpricedOrders counts orders whose total is unknown."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tracking",
+      "description": "Universal tracking: type any order number, tracking number, AWB or consignment ID. Always returns the same shape: match (ORDER_ID | TRACKING_NUMBER | NONE), order, currentStatus, shipment { trackingNumber, carrier, possibleCarriers, trackingUrl }, timeline (newest first), live { available, provider, reason }.",
+      "item": [
+        {
+          "name": "Track by order number",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/tracking?q=BSC2002300305",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tracking"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "BSC2002300305"
+                }
+              ]
+            },
+            "description": "Matches one of your orders by its order number."
+          }
+        },
+        {
+          "name": "Track by AWB / tracking number",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/tracking?q=5001228085443",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tracking"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "5001228085443"
+                }
+              ]
+            },
+            "description": "Matches one of your orders by its tracking number."
+          }
+        },
+        {
+          "name": "Track an unknown AWB",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/tracking?q=1Z999AA10123456784",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tracking"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "1Z999AA10123456784"
+                }
+              ]
+            },
+            "description": "Not one of your orders: the courier is recognised from the ID format and a tracking link is returned where the courier has one."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "List categories",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories"
+              ]
+            },
+            "description": "All categories so far: the defaults plus any created automatically (e.g. FRAGRANCE)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Phone Messages",
+      "description": "Order SMS and app notifications captured by the mobile app. Each message comes back ATTACHED (added to an existing order), CREATED (new order), IGNORED (not about an order; not stored), DUPLICATE (already processed — safe to resend) or FAILED (resend later). OTPs are masked before storage. Max 100 messages per request.",
+      "item": [
+        {
+          "name": "Send SMS / notifications",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messages\": [\n    {\n      \"id\": \"phone-msg-1\",\n      \"source\": \"NOTIFICATION\",\n      \"sender\": \"com.application.zomato\",\n      \"title\": \"Order confirmed\",\n      \"body\": \"Your order of Rs. 449 from Paradise Biryani is confirmed\",\n      \"receivedAt\": \"2026-11-18T19:00:00+05:30\"\n    },\n    {\n      \"id\": \"phone-msg-2\",\n      \"source\": \"SMS\",\n      \"sender\": \"JD-DLHVRY\",\n      \"title\": null,\n      \"body\": \"Your Delhivery shipment with AWB 1234567890123 from Amazon is out for delivery today. Share OTP 4821 with the delivery agent.\",\n      \"receivedAt\": \"2026-11-18T19:02:00+05:30\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "messages"
+              ]
+            },
+            "description": "Fields per message: id (the phone's message ID), source (SMS | NOTIFICATION), sender (SMS sender ID like JD-DLHVRY, or app package like com.application.zomato), title (notification title, null for SMS), body, receivedAt (ISO date with offset)."
+          }
+        }
+      ]
+    }
+  ]
+}

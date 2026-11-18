@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{baseUrl}}/auth/verify-otp"
+method: POST
+order: 2000
+scripts:
+  - type: afterResponse
+    code: |-
+      const res = pm.response.json();
+      if (res.success && res.data) {
+        pm.globals.set("accessToken", res.data.accessToken);
+        pm.globals.set("refreshToken", res.data.refreshToken);
+        console.log("[verify-otp] accessToken and refreshToken saved to globals.");
+      }
+    language: text/javascript
