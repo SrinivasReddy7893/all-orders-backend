@@ -62,7 +62,9 @@ export const connectGmailAccount = async (code: string, state: string) => {
 
   await prisma.connectedEmailAccount.upsert({
     where: { email },
+    // Whoever just proved they own this Gmail gets it (last sign-in wins).
     update: {
+      userId,
       googleAccessToken: encryptSecret(tokens.access_token),
       googleRefreshToken: tokens.refresh_token ? encryptSecret(tokens.refresh_token) : undefined,
       tokenExpiry,

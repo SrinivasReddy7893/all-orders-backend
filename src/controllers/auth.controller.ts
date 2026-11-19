@@ -33,8 +33,9 @@ export const googleCallbackController = asyncHandler(async (req: Request, res: R
   if (typeof code !== "string" || typeof state !== "string") {
     throw new AppError("Google code or state missing", 400, "BAD_REQUEST");
   }
-  const { email } = await connectGmailAccount(code, state);
-  res.json({ success: true, message: "Gmail connected", data: { email } });
+  await connectGmailAccount(code, state);
+  // Hand the user straight back to the app (allorders:// is registered there).
+  res.redirect(302, "allorders://gmail-connected");
 });
 
 export const logoutController = asyncHandler(async (req: Request, res: Response) => {
