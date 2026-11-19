@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { updateProfileService, deleteUserService } from "../services/user.service";
 import { updateProfileSchema } from "../validations/user.validation";
+import prisma from "../config/prisma";
 
 export const getMeController = asyncHandler(
   async (req: Request, res: Response) => {
@@ -10,6 +11,12 @@ export const getMeController = asyncHandler(
     if (!user) {
       throw new Error("User not found");
     }
+
+    // The connected Gmail account, so the app knows whether to ask for it.
+    const gmailAccount = await prisma.connectedEmailAccount.findFirst({
+      where: { userId: user.id, provider: "gmail" },
+      select: { email: true, lastSyncedAt: true, isSyncing: true },
+    });
 
     const responseUser = {
       id: user.id,
@@ -29,6 +36,7 @@ export const getMeController = asyncHandler(
       hasEmail: !!user.email,
       hasName: !!user.name,
       hasAvatar: !!user.avatar,
+      gmail: gmailAccount,
 
       isProfileComplete:
         user.isPhoneVerified &&
