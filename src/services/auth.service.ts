@@ -7,7 +7,8 @@ import { logger } from "../utils/logger";
 import { MAX_OTP_ATTEMPTS, OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, generateOtp, hashOtp, otpMatches } from "./otp";
 
 const ACCESS_TOKEN_TTL = "15m";
-const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// Rolling: every refresh issues a new token, so 30 days counts from the last app open.
+const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 const hashToken = (token: string) => crypto.createHash("sha256").update(token).digest("hex");
 
