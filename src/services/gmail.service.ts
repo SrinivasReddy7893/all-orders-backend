@@ -6,9 +6,11 @@
 import { google, gmail_v1 } from "googleapis";
 import { extractTrackingNumber } from "../utils/extractTrackingNumber";
 import { extractTitles } from "../utils/extractTitle";
-import { getEmailAllText, getEmailLinks, getEmailText } from "../utils/emailText";
+import { getEmailAllText, getEmailHtml, getEmailLinks, getEmailText } from "../utils/emailText";
 import { detectShipment } from "./tracking/carriers";
 import { extractOrderTotal } from "../utils/extractAmount";
+import { extractBrandLogo } from "../utils/extractBrandLogo";
+import { extractExpectedDelivery } from "../utils/extractExpectedDelivery";
 import { getAuthorizedGmailClient } from "./google.service";
 import { logger } from "../utils/logger";
 import {
@@ -80,6 +82,7 @@ const parseMessage = (message: gmail_v1.Schema$Message): OrderEmail | null => {
   const titles = extractTitles(body, subject);
   const total = extractOrderTotal(body);
   const shippingText = `${headline}\n${getEmailAllText(message.payload)}`;
+  const expected = extractExpectedDelivery(`${headline}\n${body}`, new Date(date));
   const trackingNumber = extractTrackingNumber(shippingText);
   const shipment = detectShipment(shippingText, getEmailLinks(message.payload), trackingNumber);
 
@@ -96,6 +99,8 @@ const parseMessage = (message: gmail_v1.Schema$Message): OrderEmail | null => {
     trackingNumber,
     carrier: shipment.carrier,
     trackingUrl: shipment.trackingUrl,
+    expectedDelivery: expected?.toISOString() ?? null,
+    logoUrl: extractBrandLogo(getEmailHtml(message.payload), { vendor, from }),
     title: titles[0] ?? null,
     titles,
     amount: total?.amount ?? null,
@@ -113,11 +118,11 @@ const FETCH_CONCURRENCY = 10;
 
 export const fetchOrdersFromGmail = async (
   userId: string,
-  options: { maxMessages?: number; fullResync?: boolean } = {}
+  options: { maxMessages?: number; fullResync?: boolean; accountId?: string } = {}
 ): Promise<OrderEmail[]> => {
-  const { maxMessages = 500, fullResync = false } = options;
+  const { maxMessages = 500, fullResync = false, accountId } = options;
 
-  const { client, connectedAccount } = await getAuthorizedGmailClient(userId);
+  const { client, connectedAccount } = await getAuthorizedGmailClient(userId, accountId);
   const gmail = google.gmail({ version: "v1", auth: client });
 
   const now = Math.floor(Date.now() / 1000);

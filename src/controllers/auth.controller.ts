@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
 import { sendOtpService, verifyOtpService, refreshTokenService, logoutService } from "../services/auth.service";
 import { generateGoogleAuthUrl, connectGmailAccount } from "../services/google.service";
+import { assertCanConnectMore } from "../services/mailbox.service";
+import { syncAccount } from "../services/orderSync.service";
+import { logger } from "../utils/logger";
 import { asyncHandler } from "../utils/asyncHandler";
 import { AppError } from "../utils/AppError";
 import { logoutSchema, refreshSchema, sendOtpSchema, verifyOtpSchema } from "../validations/auth.validation";
@@ -25,6 +28,7 @@ export const refreshTokenController = asyncHandler(async (req: Request, res: Res
 });
 
 export const connectGmailController = asyncHandler(async (req: Request, res: Response) => {
+  await assertCanConnectMore(req.user.id);
   res.json({ success: true, data: { url: generateGoogleAuthUrl(req.user.id) } });
 });
 
@@ -33,7 +37,9 @@ export const googleCallbackController = asyncHandler(async (req: Request, res: R
   if (typeof code !== "string" || typeof state !== "string") {
     throw new AppError("Google code or state missing", 400, "BAD_REQUEST");
   }
-  await connectGmailAccount(code, state);
+  const account = await connectGmailAccount(code, state);
+  // Start reading right away instead of waiting for the next 15-minute run.
+  syncAccount(account).catch((error) => logger.error(`First sync failed for ${account.email}`, error));
   // Hand the user straight back to the app (allorders:// is registered there).
   res.redirect(302, "allorders://gmail-connected");
 });

@@ -3,9 +3,9 @@ import prisma from "../config/prisma";
 import { asyncHandler } from "../utils/asyncHandler";
 import { AppError } from "../utils/AppError";
 import { syncAccount } from "../services/orderSync.service";
-import { getOrders, getActiveOrders, getMonthlySummary } from "../services/order.service";
+import { getOrders, getActiveOrders, getMonthlySummary, setOrderStatus } from "../services/order.service";
 import { currentMonth } from "../services/spendSummary";
-import { listOrdersQuerySchema, summaryQuerySchema } from "../validations/order.validation";
+import { listOrdersQuerySchema, setStatusSchema, summaryQuerySchema } from "../validations/order.validation";
 
 // POST /orders/sync — sync now instead of waiting for the 15-minute job.
 export const syncOrdersController = asyncHandler(async (req: Request, res: Response) => {
@@ -38,4 +38,11 @@ export const getOrdersSummaryController = asyncHandler(async (req: Request, res:
   const { month = currentMonth() } = summaryQuerySchema.parse(req.query);
   const summary = await getMonthlySummary(req.user.id, month);
   res.json({ success: true, data: summary });
+});
+
+// PATCH /orders/:id/status { status } — the buyer moves an order forward on its timeline.
+export const setStatusController = asyncHandler(async (req: Request, res: Response) => {
+  const { status, date } = setStatusSchema.parse(req.body);
+  const order = await setOrderStatus(req.user.id, String(req.params.id), status, date);
+  res.json({ success: true, data: { order } });
 });

@@ -6,6 +6,7 @@ import { env } from "../config/env";
 import { AppError } from "../utils/AppError";
 import { logger } from "../utils/logger";
 import { decryptSecret, encryptSecret } from "../utils/tokenCrypto";
+import { disconnectMailbox, planConnect } from "./mailbox.service";
 
 // The OAuth `state` is a short-lived signed token, so the callback can trust
 // which user started the flow. A separate secret keeps it from ever being
@@ -60,33 +61,46 @@ export const connectGmailAccount = async (code: string, state: string) => {
 
   const tokenExpiry = tokens.expiry_date ? new Date(tokens.expiry_date) : null;
 
-  await prisma.connectedEmailAccount.upsert({
-    where: { email },
-    // Whoever just proved they own this Gmail gets it (last sign-in wins).
-    update: {
-      userId,
-      googleAccessToken: encryptSecret(tokens.access_token),
-      googleRefreshToken: tokens.refresh_token ? encryptSecret(tokens.refresh_token) : undefined,
-      tokenExpiry,
-    },
-    create: {
-      userId,
-      email,
-      provider: "gmail",
-      googleAccessToken: encryptSecret(tokens.access_token),
-      googleRefreshToken: encryptSecret(tokens.refresh_token ?? ""),
-      tokenExpiry,
-    },
-  });
+  const [existing, userMailboxCount] = await Promise.all([
+    prisma.connectedEmailAccount.findUnique({ where: { email }, select: { id: true, userId: true } }),
+    prisma.connectedEmailAccount.count({ where: { userId } }),
+  ]);
+  const plan = planConnect({ userId, existingOwnerId: existing?.userId ?? null, userMailboxCount });
 
-  return { email };
+  if (plan === "limit") {
+    throw new AppError("You have reached the mailbox limit. Remove one to add another.", 400, "MAILBOX_LIMIT");
+  }
+  // A Gmail that moves to a new owner takes its orders along: the previous
+  // owner's copies are removed first, so nobody keeps another person's mail.
+  if (plan === "takeover" && existing) {
+    logger.warn(`Gmail ${email} moved to a new owner; clearing the previous owner's orders from it`);
+    await disconnectMailbox(existing.userId, existing.id);
+  }
+
+  const secrets = {
+    googleAccessToken: encryptSecret(tokens.access_token),
+    googleRefreshToken: tokens.refresh_token ? encryptSecret(tokens.refresh_token) : undefined,
+    tokenExpiry,
+    needsReconnect: false,
+  };
+  let account: { id: string };
+  if (plan === "refresh") {
+    account = await prisma.connectedEmailAccount.update({ where: { email }, data: secrets, select: { id: true } });
+  } else {
+    account = await prisma.connectedEmailAccount.create({
+      select: { id: true },
+      data: { userId, email, provider: "gmail", ...secrets, googleRefreshToken: encryptSecret(tokens.refresh_token ?? "") },
+    });
+  }
+
+  return { email, id: account.id, userId };
 };
 
 // Returns an OAuth client authorised for this user's connected Gmail account,
 // refreshing (and persisting) the access token when needed.
-export const getAuthorizedGmailClient = async (userId: string) => {
+export const getAuthorizedGmailClient = async (userId: string, accountId?: string) => {
   const connectedAccount = await prisma.connectedEmailAccount.findFirst({
-    where: { userId, provider: "gmail" },
+    where: { userId, provider: "gmail", ...(accountId ? { id: accountId } : {}) },
   });
 
   if (!connectedAccount) {

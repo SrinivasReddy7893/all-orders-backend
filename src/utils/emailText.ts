@@ -65,3 +65,6 @@ export const getEmailLinks = (payload?: gmail_v1.Schema$MessagePart): string[] =
   walk(payload);
   return [...links];
 };
+
+// The HTML body of an email, if it has one.
+export const getEmailHtml = (payload?: gmail_v1.Schema$MessagePart): string => collectParts(payload).html ?? "";

@@ -44,6 +44,9 @@ model ConnectedEmailAccount {
   lastSyncedAt        DateTime?
   isSyncing           Boolean @default(false)
   syncStartedAt       DateTime? // when the current sync took the lock (stale after 15 min)
+  needsReconnect      Boolean  @default(false) // Google revoked access; the user must connect again
+
+  orders              OrderMailbox[]
 
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -100,6 +103,7 @@ model Order {
   orderedAt         DateTime?
   expectedDelivery  DateTime?
   deliveredAt       DateTime?
+  cancelledAt       DateTime?
 
   // Raw email reference (important)
   source            OrderSource @default(EMAIL)
@@ -113,6 +117,7 @@ model Order {
   carrierName      String?
   trackingUrl      String?  // courier's tracking page for this shipment
   events           OrderEvent[]
+  mailboxes        OrderMailbox[]
   gmailMessageId   String? @unique
 
   createdAt         DateTime @default(now())
@@ -129,6 +134,27 @@ model Order {
 
 
 
+
+// A shop's own logo, taken from one of its order emails the first time we see
+// the brand. Public brand art, so it is shared by every user of that shop.
+model Brand {
+  vendor    String   @id // the same key orders use, e.g. "APPLE"
+  logoUrl   String
+  createdAt DateTime @default(now())
+}
+
+// Which connected mailbox an order was found in. An order can sit in several
+// (the same email reaching two inboxes); disconnecting a mailbox removes the
+// orders that were found nowhere else.
+model OrderMailbox {
+  orderId   String
+  order     Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  accountId String
+  account   ConnectedEmailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@id([orderId, accountId])
+  @@index([accountId])
+}
 
 // One step in an order's tracking timeline: an order email today, courier
 // scans from a live tracking provider later.

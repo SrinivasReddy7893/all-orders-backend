@@ -39,6 +39,8 @@ export type OrderEmail = {
   currency: string | null;
   carrier: { code: string; name: string } | null; // courier / shipping aggregator
   trackingUrl: string | null;
+  expectedDelivery?: string | null; // delivery date the email promises (ISO)
+  logoUrl?: string | null;          // the brand's own logo, if this email carries it
   orderedAt?: string;      // set by mergeOrders: date of the order's first email
   events?: OrderEvent[];   // set by mergeOrders: one per email, oldest first
 };
@@ -128,8 +130,14 @@ const matchStatus = (text: string): OrderStatus | null =>
 
 // The subject states what this email is about; the snippet often mentions
 // future steps ("will be delivered by…"), so it is only a fallback.
-export const detectStatus = (subject: string, snippet: string): OrderStatus =>
-  matchStatus(subject) ?? matchStatus(snippet) ?? "PLACED";
+export const detectStatus = (subject: string, snippet: string): OrderStatus => {
+  const fromSubject = matchStatus(subject);
+  // "Your order is arriving early!" is only the headline; the body says when.
+  if (fromSubject === "SHIPPED" && DELIVERY_TODAY.test(snippet)) return "OUT_FOR_DELIVERY";
+  return fromSubject ?? matchStatus(snippet) ?? "PLACED";
+};
+
+const DELIVERY_TODAY = /\b(delivered|delivery|arriving)\s+today\b/i;
 
 // ─────────────────────────────────────────────
 // STEP 4 — ORDER ID EXTRACTION
@@ -296,6 +304,8 @@ const combine = (existing: OrderEmail, email: OrderEmail): OrderEmail => {
     trackingNumber: primary.trackingNumber ?? other.trackingNumber,
     carrier: primary.carrier ?? other.carrier,
     trackingUrl: primary.trackingUrl ?? other.trackingUrl,
+    expectedDelivery: primary.expectedDelivery ?? other.expectedDelivery ?? null,
+    logoUrl: primary.logoUrl ?? other.logoUrl ?? null,
     titles: primary.titles.length ? primary.titles : other.titles,
     title: primary.title ?? other.title,
     // Total and order date come from the earliest emails (the confirmation);

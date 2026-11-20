@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { updateProfileService, deleteUserService } from "../services/user.service";
 import { updateProfileSchema } from "../validations/user.validation";
-import prisma from "../config/prisma";
+import { listMailboxes, disconnectMailbox, MAX_MAILBOXES } from "../services/mailbox.service";
 
 export const getMeController = asyncHandler(
   async (req: Request, res: Response) => {
@@ -12,11 +12,8 @@ export const getMeController = asyncHandler(
       throw new Error("User not found");
     }
 
-    // The connected Gmail account, so the app knows whether to ask for it.
-    const gmailAccount = await prisma.connectedEmailAccount.findFirst({
-      where: { userId: user.id, provider: "gmail" },
-      select: { email: true, lastSyncedAt: true, isSyncing: true },
-    });
+    // Connected mailboxes, so the app knows whether to ask for one and which need attention.
+    const mailboxes = await listMailboxes(user.id);
 
     const responseUser = {
       id: user.id,
@@ -36,7 +33,8 @@ export const getMeController = asyncHandler(
       hasEmail: !!user.email,
       hasName: !!user.name,
       hasAvatar: !!user.avatar,
-      gmail: gmailAccount,
+      mailboxes,
+      maxMailboxes: MAX_MAILBOXES,
 
       isProfileComplete:
         user.isPhoneVerified &&
@@ -93,5 +91,13 @@ export const deleteUserController = asyncHandler(
       success: true,
       message: result.message,
     });
+  }
+);
+
+// DELETE /user/mailboxes/:id — remove a mailbox and the orders found only in it.
+export const disconnectMailboxController = asyncHandler(
+  async (req: Request, res: Response) => {
+    const result = await disconnectMailbox(req.user!.id, String(req.params.id));
+    res.status(200).json({ success: true, data: result });
   }
 );

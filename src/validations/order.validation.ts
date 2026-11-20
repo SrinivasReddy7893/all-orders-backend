@@ -19,3 +19,9 @@ export const summaryQuerySchema = z.object({
     .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "month must look like 2026-05")
     .optional(),
 });
+
+export const setStatusSchema = z.object({
+  status: z.enum(["PLACED", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"]),
+  // The day it was delivered or cancelled, YYYY-MM-DD. Defaults to now.
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});

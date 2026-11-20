@@ -162,6 +162,21 @@ describe("mergeOrders — shipping emails without an order number", () => {
   });
 });
 
+describe("detectStatus: arriving today", () => {
+  test("a headline of 'arriving early' with delivery today in the body is out for delivery", () => {
+    assert.equal(
+      detectStatus(
+        "Koganti Srinivas Reddy, your boAt order is arriving early!",
+        "Dear Koganti, Your order is arriving early! Your boAt order is arriving earlier than expected and will be delivered today before 7 pm. Arriving on Sunday, May 10th"
+      ),
+      "OUT_FOR_DELIVERY"
+    );
+  });
+  test("'arriving' alone, with no day today, stays shipped", () => {
+    assert.equal(detectStatus("Your order is arriving soon", "Arriving on Sunday, May 10th"), "SHIPPED");
+  });
+});
+
 describe("detectStatus", () => {
   test("canceled (US spelling) is CANCELLED", () => {
     assert.equal(detectStatus("Order #D&D1015 has been canceled", ""), "CANCELLED");
